@@ -17,7 +17,21 @@ async function initializeDatabase() {
 
         db = await mysql.createConnection(connectionConfig);
         console.log('Connected to MySQL database');
-        await createDatabaseTables();
+
+        // Check if tables exist
+        const [tables] = await db.execute(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE()
+        `);
+
+        // Only create tables if they don't exist
+        if (tables.length === 0) {
+            await createDatabaseTables();
+        } else {
+            console.log('Database tables already exist, skipping creation');
+        }
+
         console.log('Database initialized successfully');
     } catch (error) {
         console.error('Error initializing database:', error);
@@ -27,7 +41,7 @@ async function initializeDatabase() {
 
 async function createDatabaseTables() {
     try {
-        console.log('Creating database tables if they don\'t exist...');
+        console.log('Creating database tables...');
 
         // Create customers table
         await db.execute(`
@@ -82,7 +96,7 @@ async function createDatabaseTables() {
             VALUES ('po_number', 0), ('invoice_number', 0)
         `);
 
-        console.log('Database tables checked/created successfully');
+        console.log('Database tables created successfully');
     } catch (error) {
         console.error('Error creating database tables:', error);
         throw error;
