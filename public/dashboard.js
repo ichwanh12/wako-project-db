@@ -136,21 +136,45 @@ document.getElementById('transactionForm').addEventListener('submit', async func
     e.preventDefault();
 
     try {
+        // Get form values
+        const customerName = document.getElementById('customerName').value;
+        const itemName = document.getElementById('itemName').value;
         const unitPrice = parseFloat(document.getElementById('unitPrice').value);
         const quantity = parseInt(document.getElementById('quantity').value);
         const totalPrice = unitPrice * quantity;
 
+        // Validate required fields
+        if (!customerName || !itemName || !unitPrice || !quantity) {
+            throw new Error('Please fill in all required fields');
+        }
+
+        // Validate numbers
+        if (isNaN(unitPrice) || unitPrice <= 0) {
+            throw new Error('Please enter a valid unit price');
+        }
+        if (isNaN(quantity) || quantity <= 0) {
+            throw new Error('Please enter a valid quantity');
+        }
+
+        // Create form data
         const formData = {
             po_number: generatePONumber(),
-            customer_name: document.getElementById('customerName').value,
-            item_name: document.getElementById('itemName').value,
+            customer_name: customerName,
+            item_name: itemName,
             unit_price: unitPrice,
             quantity: quantity,
-            total_price: totalPrice,
-            consignment_name: document.getElementById('consignmentName').value || null,
-            consignment_qty: document.getElementById('consignmentQty').value ? parseInt(document.getElementById('consignmentQty').value) : null,
-            consignment_price: document.getElementById('consignmentQty').value ? unitPrice : null
+            total_price: totalPrice
         };
+
+        // Add consignment data if provided
+        const consignmentName = document.getElementById('consignmentName').value;
+        const consignmentQty = document.getElementById('consignmentQty').value;
+        
+        if (consignmentName && consignmentQty) {
+            formData.consignment_name = consignmentName;
+            formData.consignment_qty = parseInt(consignmentQty);
+            formData.consignment_price = unitPrice;
+        }
 
         console.log('Sending transaction data:', formData);
 
@@ -163,9 +187,10 @@ document.getElementById('transactionForm').addEventListener('submit', async func
             body: JSON.stringify(formData)
         });
 
+        const responseData = await response.json();
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to save transaction');
+            throw new Error(responseData.error || 'Failed to save transaction');
         }
 
         Swal.fire({
@@ -184,7 +209,6 @@ document.getElementById('transactionForm').addEventListener('submit', async func
         const listTab = document.getElementById('list-tab');
         const tab = new bootstrap.Tab(listTab);
         tab.show();
-        loadTransactions();
     } catch (error) {
         console.error('Error:', error);
         Swal.fire({
