@@ -197,10 +197,17 @@ async function loadTransactions() {
                 return summary;
             }).join('<hr class="my-1">');
 
+            // Create customer info
+            const customerInfo = `
+                ${t.company_name ? `<strong>${t.company_name}</strong><br>` : ''}
+                Contact: ${t.customer_name}
+                ${t.customer_phone ? `<br>Phone: ${t.customer_phone}` : ''}
+            `;
+
             row.innerHTML = `
                 <td>${t.po_number}</td>
                 <td>${formatDate(t.date)}</td>
-                <td>${t.customer_name}</td>
+                <td>${customerInfo}</td>
                 <td>${itemsSummary}</td>
                 <td>${formatCurrency(total)}</td>
                 <td>
@@ -243,50 +250,27 @@ document.getElementById('transactionForm').addEventListener('submit', async func
     e.preventDefault();
 
     try {
-        const customerName = document.getElementById('customerName').value;
-        if (!customerName) {
-            throw new Error('Please enter customer name');
-        }
-
-        // Get all item rows
-        const itemRows = document.getElementById('itemsContainer').children;
-        if (itemRows.length === 0) {
-            throw new Error('Please add at least one item');
-        }
-
-        // Collect items data
         const items = [];
+        const itemRows = document.getElementById('itemsContainer').children;
+
         for (const row of itemRows) {
-            const itemName = row.querySelector('.item-name').value;
-            const unitPrice = parseFloat(row.querySelector('.item-unit-price').value);
-            const quantity = parseInt(row.querySelector('.item-quantity').value);
-            const consignmentName = row.querySelector('.item-consignment-name').value;
-            const consignmentQty = row.querySelector('.item-consignment-qty').value;
-
-            if (!itemName || !unitPrice || !quantity) {
-                throw new Error('Please fill in all required fields for each item');
-            }
-
             const item = {
-                item_name: itemName,
-                unit_price: unitPrice,
-                quantity: quantity
+                item_name: row.querySelector('.item-name').value,
+                unit_price: parseFloat(row.querySelector('.item-unit-price').value),
+                quantity: parseInt(row.querySelector('.item-quantity').value),
+                total_price: parseFloat(row.querySelector('.item-total-price').value)
             };
 
-            if (consignmentName && consignmentQty) {
+            const consignmentName = row.querySelector('.item-consignment-name').value;
+            const consignmentQty = parseInt(row.querySelector('.item-consignment-qty').value) || 0;
+
+            if (consignmentName && consignmentQty > 0) {
                 item.consignment_name = consignmentName;
-                item.consignment_qty = parseInt(consignmentQty);
+                item.consignment_qty = consignmentQty;
             }
 
             items.push(item);
         }
-
-        const formData = {
-            customer_name: customerName,
-            items: items
-        };
-
-        console.log('Sending transaction data:', formData);
 
         const response = await fetch('/api/transactions', {
             method: 'POST',
@@ -294,41 +278,39 @@ document.getElementById('transactionForm').addEventListener('submit', async func
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify({
+                company_name: document.getElementById('companyName').value,
+                customer_name: document.getElementById('customerName').value,
+                customer_phone: document.getElementById('customerPhone').value,
+                items: items
+            })
         });
 
-        const responseData = await response.json();
-
         if (!response.ok) {
-            throw new Error(responseData.error || 'Failed to save transaction');
+            throw new Error('Failed to save transaction');
         }
 
+        const data = await response.json();
+        
         Swal.fire({
             icon: 'success',
             title: 'Success!',
-            text: 'Transaction saved successfully',
-            showConfirmButton: false,
-            timer: 1500
+            text: `Transaction saved with PO number: ${data.po_number}`
         });
 
         // Reset form
         e.target.reset();
         document.getElementById('itemsContainer').innerHTML = '';
         addItemRow(); // Add one empty item row
-        
-        // Switch to list tab and reload transactions
-        const listTab = document.getElementById('list-tab');
-        const tab = new bootstrap.Tab(listTab);
-        tab.show();
-        
-        // Load transactions after successful save
-        loadTransactions();
+
+        // Switch to list tab
+        document.getElementById('list-tab').click();
     } catch (error) {
         console.error('Error:', error);
         Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: error.message || 'Failed to save transaction'
+            text: error.message
         });
     }
 });

@@ -51,7 +51,9 @@ async function initializeDatabase() {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 po_number VARCHAR(50) NOT NULL UNIQUE,
                 date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                company_name VARCHAR(100),
                 customer_name VARCHAR(100) NOT NULL,
+                customer_phone VARCHAR(20),
                 invoice_number VARCHAR(50) UNIQUE,
                 invoice_date TIMESTAMP NULL
             )
@@ -192,13 +194,13 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
     try {
         await db.beginTransaction();
 
-        const { customer_name, items } = req.body;
+        const { customer_name, company_name, customer_phone, items } = req.body;
         const po_number = await generatePONumber();
 
         // Insert purchase order
         const [poResult] = await db.execute(
-            'INSERT INTO purchase_orders (po_number, customer_name) VALUES (?, ?)',
-            [po_number, customer_name]
+            'INSERT INTO purchase_orders (po_number, company_name, customer_name, customer_phone) VALUES (?, ?, ?, ?)',
+            [po_number, company_name, customer_name, customer_phone]
         );
 
         const po_id = poResult.insertId;
@@ -238,7 +240,9 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
             SELECT 
                 po.po_number,
                 po.date,
+                po.company_name,
                 po.customer_name,
+                po.customer_phone,
                 po.invoice_number,
                 po.invoice_date,
                 ti.item_name,
@@ -259,7 +263,9 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
                 acc[row.po_number] = {
                     po_number: row.po_number,
                     date: row.date,
+                    company_name: row.company_name,
                     customer_name: row.customer_name,
+                    customer_phone: row.customer_phone,
                     invoice_number: row.invoice_number,
                     invoice_date: row.invoice_date,
                     items: []
@@ -337,88 +343,93 @@ async function generateInvoicePDF(res, poNumber, invoiceNumber, transaction) {
 
     // Add company logo and header
     doc.fontSize(20)
-        .text('WAKO PROJECT', { align: 'center' })
-        .fontSize(12)
-        .text('Jl. Example Street No. 123', { align: 'center' })
-        .text('Phone: (123) 456-7890', { align: 'center' })
+        .text('WAKO PRINTING', { align: 'right' })
+        .moveDown(1);
+
+    // Add invoice title
+    doc.fontSize(16)
+        .text('INVOICE', { align: 'center' })
+        .moveDown(1);
+
+    // Add customer and invoice details in two columns
+    const leftColumn = 50;
+    const rightColumn = 350;
+    
+    // Left column - Customer details
+    doc.fontSize(10)
+        .text('Customer:', leftColumn)
+        .text(transaction.company_name || '', leftColumn + 10, doc.y)
+        .text(`Contact: ${transaction.customer_name}`, leftColumn + 10, doc.y + 15)
+        .text(`Phone: ${transaction.customer_phone || ''}`, leftColumn + 10, doc.y + 15);
+
+    // Right column - Invoice details
+    doc.fontSize(10)
+        .text(`Nomor P.O: ${poNumber}`, rightColumn, 120)
+        .text(`Tanggal: ${new Date(transaction.date).toLocaleDateString('id-ID')}`, rightColumn, doc.y + 15)
+        .text('No Rek BCA: 6290346817', rightColumn, doc.y + 15)
+        .text('a/n Eko prambudi', rightColumn, doc.y + 15)
         .moveDown(2);
 
-    // Add invoice details
-    doc.fontSize(14)
-        .text('INVOICE', { align: 'center' })
-        .moveDown()
-        .fontSize(10)
-        .text(`Invoice Number: ${invoiceNumber}`)
-        .text(`PO Number: ${poNumber}`)
-        .text(`Date: ${new Date().toLocaleDateString('id-ID')}`)
-        .text(`Customer: ${transaction.customer_name}`)
-        .moveDown();
-
     // Add table header
-    const tableTop = doc.y;
-    const itemX = 50;
-    const qtyX = 300;
-    const priceX = 400;
-    const totalX = 500;
+    const tableTop = doc.y + 30;
+    doc.fontSize(10);
 
-    doc.fontSize(10)
-        .text('Item', itemX, tableTop)
-        .text('Qty', qtyX, tableTop)
-        .text('Price', priceX, tableTop)
-        .text('Total', totalX, tableTop)
-        .moveDown();
+    // Draw table header
+    doc.rect(50, tableTop - 5, 500, 20).fill('#f0f0f0').stroke('#000000');
+    doc.fill('#000000')
+        .text('NAMA BARANG / JASA', 60, tableTop)
+        .text('KUANTITI', 280, tableTop)
+        .text('HARGA SATUAN', 350, tableTop)
+        .text('JUMLAH', 450, tableTop);
 
-    let y = doc.y;
-
-    // Add horizontal line
-    doc.moveTo(50, y)
-        .lineTo(550, y)
-        .stroke();
-
-    y += 10;
+    let y = tableTop + 25;
 
     // Add items
     let grandTotal = 0;
-    transaction.items.forEach(item => {
-        const itemTotal = item.quantity * item.unit_price;
-        grandTotal += itemTotal;
+    transaction.items.forEach((item, index) => {
+        // Draw item row
+        doc.text(item.item_name, 60, y)
+            .text(item.quantity.toString(), 280, y)
+            .text(formatCurrency(item.unit_price).split('Rp')[1], 350, y)
+            .text(formatCurrency(item.quantity * item.unit_price).split('Rp')[1], 450, y);
 
-        doc.text(item.item_name, itemX, y)
-            .text(item.quantity.toString(), qtyX, y)
-            .text(formatCurrency(item.unit_price), priceX, y)
-            .text(formatCurrency(itemTotal), totalX, y);
+        grandTotal += item.quantity * item.unit_price;
+        y += 25;
 
         // Add consignment if exists
         if (item.consignment_name) {
-            y += 20;
-            const consignmentTotal = item.consignment_qty * item.unit_price;
-            grandTotal += consignmentTotal;
+            doc.text(`${item.consignment_name} (Titipan)`, 60, y)
+                .text(item.consignment_qty.toString(), 280, y)
+                .text(formatCurrency(item.unit_price).split('Rp')[1], 350, y)
+                .text(formatCurrency(item.consignment_qty * item.unit_price).split('Rp')[1], 450, y);
 
-            doc.text(`${item.consignment_name} (Titipan)`, itemX, y)
-                .text(item.consignment_qty.toString(), qtyX, y)
-                .text(formatCurrency(item.unit_price), priceX, y)
-                .text(formatCurrency(consignmentTotal), totalX, y);
+            grandTotal += item.consignment_qty * item.unit_price;
+            y += 25;
         }
-
-        y += 30;
     });
 
-    // Add horizontal line
-    doc.moveTo(50, y)
-        .lineTo(550, y)
-        .stroke();
-
+    // Draw total section
     y += 10;
-
-    // Add grand total
-    doc.fontSize(12)
-        .text('Grand Total:', 400, y)
-        .text(formatCurrency(grandTotal), totalX, y);
-
-    // Add footer
     doc.fontSize(10)
-        .moveDown(4)
-        .text('Thank you for your business!', { align: 'center' });
+        .text('TOTAL:', 350, y)
+        .text(formatCurrency(grandTotal).split('Rp')[1], 450, y);
+
+    // Add notes
+    y += 40;
+    doc.fontSize(9)
+        .text('Keterangan:', 50, y)
+        .text('* Pembayaran Tanda Jadi (DP) 0%', 50, y + 15)
+        .text('* Batas pembayaran MAX 7 hari setelah Invoice terbit', 50, y + 30);
+
+    // Add signature section
+    y += 80;
+    doc.fontSize(10)
+        .text('Diterima dan Disetujui', 50, y)
+        .text('Hormat kami,', 400, y)
+        .moveDown(3)
+        .text('_____________________', 50, doc.y)
+        .text('Purchase dept', 400, doc.y)
+        .text('Tanda tangan, Nama jelas & Cap perusahaan', 50, doc.y + 15);
 
     // Finalize the PDF
     doc.end();
@@ -442,7 +453,9 @@ app.get('/api/transactions/:poNumber/invoice/download', authenticateToken, async
             SELECT 
                 po.po_number,
                 po.date,
+                po.company_name,
                 po.customer_name,
+                po.customer_phone,
                 po.invoice_number,
                 po.invoice_date,
                 ti.item_name,
@@ -465,7 +478,9 @@ app.get('/api/transactions/:poNumber/invoice/download', authenticateToken, async
         const transaction = {
             po_number: rows[0].po_number,
             date: rows[0].date,
+            company_name: rows[0].company_name,
             customer_name: rows[0].customer_name,
+            customer_phone: rows[0].customer_phone,
             invoice_number: rows[0].invoice_number,
             invoice_date: rows[0].invoice_date,
             items: rows.map(row => ({

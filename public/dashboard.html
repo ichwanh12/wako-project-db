@@ -103,9 +103,17 @@
                     <div class="card-body">
                         <form id="transactionForm">
                             <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Customer Name</label>
-                                    <input type="text" class="form-control" id="customerName" required>
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Perusahaan Customer</label>
+                                    <input type="text" class="form-control" id="companyName" placeholder="Nama Perusahaan">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nama Customer</label>
+                                    <input type="text" class="form-control" id="customerName" required placeholder="Nama Kontak Person">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nomor Customer</label>
+                                    <input type="text" class="form-control" id="customerPhone" placeholder="Nomor Telepon">
                                 </div>
                             </div>
 
@@ -140,8 +148,9 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
+                                        <th>PO Number</th>
                                         <th>Date</th>
-                                        <th>Customer</th>
+                                        <th>Customer Info</th>
                                         <th>Items</th>
                                         <th>Total</th>
                                         <th>Invoice</th>
