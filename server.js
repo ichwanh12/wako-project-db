@@ -15,8 +15,13 @@ let db;
 // Database connection
 async function initializeDatabase() {
   try {
+    const url = new URL(process.env.MYSQL_URL);
     db = await mysql.createConnection({
-      uri: process.env.MYSQL_URL
+      host: url.hostname,
+      user: url.username,
+      password: url.password,
+      database: url.pathname.substr(1),
+      port: url.port
     });
     
     console.log('Connected to MySQL database');
