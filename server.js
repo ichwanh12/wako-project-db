@@ -1,5 +1,5 @@
 const express = require('express');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -10,17 +10,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database connection
 let db;
-try {
-  db = mysql.createConnection(process.env.MYSQL_URL);
-  console.log('Attempting to connect to MySQL...');
-  
-  db.connect((err) => {
-    if (err) {
-      console.error('Error connecting to database:', err);
-      return;
-    }
+
+// Database connection
+async function initializeDatabase() {
+  try {
+    db = await mysql.createConnection({
+      uri: process.env.MYSQL_URL
+    });
+    
     console.log('Connected to MySQL database');
     
     // Create tables if they don't exist
@@ -49,16 +47,12 @@ try {
       );
     `;
 
-    db.query(createTables, (err) => {
-      if (err) {
-        console.error('Error creating tables:', err);
-        return;
-      }
-      console.log('Database tables created/verified');
-    });
-  });
-} catch (error) {
-  console.error('Failed to create database connection:', error);
+    await db.query(createTables);
+    console.log('Database tables created/verified');
+  } catch (error) {
+    console.error('Database connection error:', error);
+    process.exit(1);
+  }
 }
 
 // Authentication Middleware
@@ -81,19 +75,15 @@ const authenticateToken = (req, res, next) => {
 
 // Login Route
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
+    const [users] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
 
-  db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
-    if (err) {
-      console.error('Database error during login:', err);
-      return res.status(500).json({ message: 'Database error' });
-    }
-
-    if (results.length === 0) {
+    if (users.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const user = results[0];
+    const user = users[0];
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
@@ -102,79 +92,86 @@ app.post('/api/login', async (req, res) => {
 
     const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET);
     res.json({ token });
-  });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Database error' });
+  }
 });
 
 // Register Route
 app.post('/api/register', async (req, res) => {
-  const { username, password, email } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    const { username, password, email } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  db.query(
-    'INSERT INTO users (username, password, email) VALUES (?, ?, ?)',
-    [username, hashedPassword, email],
-    (err) => {
-      if (err) {
-        console.error('Database error during registration:', err);
-        if (err.code === 'ER_DUP_ENTRY') {
-          return res.status(400).json({ message: 'Username already exists' });
-        }
-        return res.status(500).json({ message: 'Database error' });
-      }
-      res.status(201).json({ message: 'User created successfully' });
+    await db.query(
+      'INSERT INTO users (username, password, email) VALUES (?, ?, ?)',
+      [username, hashedPassword, email]
+    );
+    
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    console.error('Registration error:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'Username already exists' });
     }
-  );
+    res.status(500).json({ message: 'Database error' });
+  }
 });
 
 // Create Transaction
-app.post('/api/transactions', authenticateToken, (req, res) => {
-  const {
-    customer_name,
-    item_name,
-    price,
-    quantity,
-    unit_price,
-    total_price,
-    consignment_name,
-    consignment_qty,
-    consignment_price
-  } = req.body;
+app.post('/api/transactions', authenticateToken, async (req, res) => {
+  try {
+    const {
+      customer_name,
+      item_name,
+      price,
+      quantity,
+      unit_price,
+      total_price,
+      consignment_name,
+      consignment_qty,
+      consignment_price
+    } = req.body;
 
-  const query = `
-    INSERT INTO transactions 
-    (customer_name, item_name, price, quantity, unit_price, total_price, 
-     consignment_name, consignment_qty, consignment_price, user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
+    const [result] = await db.query(
+      `INSERT INTO transactions 
+      (customer_name, item_name, price, quantity, unit_price, total_price, 
+       consignment_name, consignment_qty, consignment_price, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [customer_name, item_name, price, quantity, unit_price, total_price,
+       consignment_name, consignment_qty, consignment_price, req.user.id]
+    );
 
-  db.query(
-    query,
-    [customer_name, item_name, price, quantity, unit_price, total_price,
-     consignment_name, consignment_qty, consignment_price, req.user.id],
-    (err, result) => {
-      if (err) {
-        console.error('Error creating transaction:', err);
-        return res.status(500).json({ message: 'Database error' });
-      }
-      res.status(201).json({ id: result.insertId });
-    }
-  );
+    res.status(201).json({ id: result.insertId });
+  } catch (error) {
+    console.error('Transaction creation error:', error);
+    res.status(500).json({ message: 'Database error' });
+  }
 });
 
 // Get Transactions
-app.get('/api/transactions', authenticateToken, (req, res) => {
-  const query = 'SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC';
-  
-  db.query(query, [req.user.id], (err, results) => {
-    if (err) {
-      console.error('Error fetching transactions:', err);
-      return res.status(500).json({ message: 'Database error' });
-    }
-    res.json(results);
-  });
+app.get('/api/transactions', authenticateToken, async (req, res) => {
+  try {
+    const [transactions] = await db.query(
+      'SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC',
+      [req.user.id]
+    );
+    res.json(transactions);
+  } catch (error) {
+    console.error('Transaction fetch error:', error);
+    res.status(500).json({ message: 'Database error' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+// Initialize database and start server
+initializeDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(error => {
+  console.error('Failed to initialize database:', error);
+  process.exit(1);
 });
