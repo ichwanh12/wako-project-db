@@ -20,7 +20,6 @@ document.querySelectorAll('.nav-link').forEach(link => {
         } else if (page === 'report') {
             document.getElementById('inputPage').style.display = 'none';
             document.getElementById('reportPage').style.display = 'block';
-            loadTransactions();
         }
     });
 });
@@ -69,6 +68,15 @@ function formatDate(dateString) {
     });
 }
 
+// Add tab change event listener
+document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function (event) {
+        if (event.target.id === 'list-tab') {
+            loadTransactions();
+        }
+    });
+});
+
 // Load transactions
 async function loadTransactions() {
     try {
@@ -84,6 +92,13 @@ async function loadTransactions() {
 
         const transactions = await response.json();
         const tbody = document.getElementById('reportTableBody');
+        
+        // Check if tbody exists before manipulating it
+        if (!tbody) {
+            console.error('Transaction list table body not found');
+            return;
+        }
+
         tbody.innerHTML = '';
 
         transactions.forEach(t => {
@@ -159,7 +174,10 @@ document.getElementById('transactionForm').addEventListener('submit', async func
         e.target.reset();
         document.getElementById('totalPrice').value = '';
         
-        // Reload transactions
+        // Switch to list tab and reload transactions
+        const listTab = document.getElementById('list-tab');
+        const tab = new bootstrap.Tab(listTab);
+        tab.show();
         loadTransactions();
     } catch (error) {
         console.error('Error:', error);
@@ -172,4 +190,4 @@ document.getElementById('transactionForm').addEventListener('submit', async func
 });
 
 // Initial load
-loadTransactions();
+document.getElementById('list-tab').click();

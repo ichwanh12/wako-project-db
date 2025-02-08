@@ -136,7 +136,7 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
       consignment_price
     } = req.body;
 
-    const [result] = await db.query(
+    const result = await db.query(
       `INSERT INTO transactions 
       (po_number, customer_name, item_name, price, quantity, unit_price, total_price, 
        consignment_name, consignment_qty, consignment_price, user_id)
@@ -145,10 +145,17 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
        consignment_name, consignment_qty, consignment_price, req.user.id]
     );
 
-    res.status(201).json({ id: result.insertId });
+    res.status(201).json({ 
+      message: 'Transaction created successfully',
+      id: result.insertId
+    });
   } catch (error) {
     console.error('Transaction creation error:', error);
-    res.status(500).json({ message: 'Database error' });
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(400).json({ error: 'Duplicate PO number' });
+    } else {
+      res.status(500).json({ error: 'Failed to create transaction' });
+    }
   }
 });
 
@@ -162,7 +169,7 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
     res.json(transactions);
   } catch (error) {
     console.error('Transaction fetch error:', error);
-    res.status(500).json({ message: 'Database error' });
+    res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
 
