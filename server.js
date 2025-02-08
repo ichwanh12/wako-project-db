@@ -15,15 +15,13 @@ let db;
 // Database connection
 async function initializeDatabase() {
   try {
-    const url = new URL(process.env.MYSQL_URL);
-    db = await mysql.createConnection({
-      host: url.hostname,
-      user: url.username,
-      password: url.password,
-      database: url.pathname.substr(1),
-      port: url.port
-    });
+    console.log('Database URL:', process.env.MYSQL_URL);
     
+    if (!process.env.MYSQL_URL) {
+      throw new Error('MYSQL_URL environment variable is not set');
+    }
+
+    db = await mysql.createConnection(process.env.MYSQL_URL);
     console.log('Connected to MySQL database');
     
     // Create tables if they don't exist
