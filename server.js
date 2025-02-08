@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Database connection
-const db = mysql.createConnection({
+const db = mysql.createConnection(process.env.MYSQL_URL || {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
