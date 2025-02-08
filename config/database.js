@@ -7,7 +7,15 @@ let db;
 
 async function initializeDatabase() {
     try {
-        db = await mysql.createConnection(dbUrl);
+        // Parse connection URL
+        const connectionConfig = {
+            uri: dbUrl,
+            ssl: {
+                rejectUnauthorized: false // Required for Railway MySQL
+            }
+        };
+
+        db = await mysql.createConnection(connectionConfig);
         console.log('Connected to MySQL database');
         await createDatabaseTables();
         console.log('Database initialized successfully');
