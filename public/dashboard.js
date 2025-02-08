@@ -91,7 +91,7 @@ async function loadTransactions() {
         }
 
         const transactions = await response.json();
-        const tbody = document.getElementById('reportTableBody');
+        const tbody = document.getElementById('transactionTableBody');
         
         // Check if tbody exists before manipulating it
         if (!tbody) {
@@ -100,6 +100,13 @@ async function loadTransactions() {
         }
 
         tbody.innerHTML = '';
+
+        if (transactions.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="8" class="text-center">No transactions found</td>';
+            tbody.appendChild(row);
+            return;
+        }
 
         transactions.forEach(t => {
             const row = document.createElement('tr');
@@ -209,6 +216,9 @@ document.getElementById('transactionForm').addEventListener('submit', async func
         const listTab = document.getElementById('list-tab');
         const tab = new bootstrap.Tab(listTab);
         tab.show();
+        
+        // Load transactions after successful save
+        loadTransactions();
     } catch (error) {
         console.error('Error:', error);
         Swal.fire({
