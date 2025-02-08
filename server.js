@@ -16,30 +16,12 @@ let db;
 async function initializeDatabase() {
   try {
     console.log('Connecting to database...');
-    console.log('Available environment variables:', Object.keys(process.env));
     
-    // Railway provides these environment variables
-    const config = {
-      host: process.env.MYSQL_HOST || process.env.MYSQLHOST || 'mysql.railway.internal',
-      user: process.env.MYSQL_USER || process.env.MYSQLUSER || 'root',
-      password: process.env.MYSQL_PASSWORD || process.env.MYSQL_ROOT_PASSWORD || process.env.MYSQLPASSWORD,
-      database: process.env.MYSQL_DATABASE || process.env.MYSQLDATABASE || 'railway',
-      port: parseInt(process.env.MYSQL_PORT || process.env.MYSQLPORT || '3306')
-    };
-    
-    console.log('Database config:', {
-      host: config.host,
-      user: config.user,
-      database: config.database,
-      port: config.port,
-      password: config.password ? '********' : 'NOT SET'
-    });
-
-    if (!config.password) {
-      throw new Error('Database password not found in environment variables');
+    if (!process.env.MYSQL_URL) {
+      throw new Error('MYSQL_URL environment variable is not set');
     }
 
-    db = await mysql.createConnection(config);
+    db = await mysql.createConnection(process.env.MYSQL_URL);
     console.log('Connected to MySQL database');
     
     // Create tables if they don't exist
