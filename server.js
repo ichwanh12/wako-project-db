@@ -11,55 +11,55 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Database connection
-const db = mysql.createConnection(process.env.MYSQL_URL || {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306
-});
-
-db.connect((err) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-    return;
-  }
-  console.log('Connected to MySQL database');
+let db;
+try {
+  db = mysql.createConnection(process.env.MYSQL_URL);
+  console.log('Attempting to connect to MySQL...');
   
-  // Create tables if they don't exist
-  const createTables = `
-    CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      username VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      email VARCHAR(255)
-    );
-
-    CREATE TABLE IF NOT EXISTS transactions (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      customer_name VARCHAR(255) NOT NULL,
-      item_name VARCHAR(255) NOT NULL,
-      price DECIMAL(10,2) NOT NULL,
-      quantity INT NOT NULL,
-      unit_price DECIMAL(10,2) NOT NULL,
-      total_price DECIMAL(10,2) NOT NULL,
-      consignment_name VARCHAR(255),
-      consignment_qty INT,
-      consignment_price DECIMAL(10,2),
-      user_id INT,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-  `;
-
-  db.query(createTables, (err) => {
+  db.connect((err) => {
     if (err) {
-      console.error('Error creating tables:', err);
+      console.error('Error connecting to database:', err);
       return;
     }
-    console.log('Database tables created/verified');
+    console.log('Connected to MySQL database');
+    
+    // Create tables if they don't exist
+    const createTables = `
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        email VARCHAR(255)
+      );
+
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        customer_name VARCHAR(255) NOT NULL,
+        item_name VARCHAR(255) NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        quantity INT NOT NULL,
+        unit_price DECIMAL(10,2) NOT NULL,
+        total_price DECIMAL(10,2) NOT NULL,
+        consignment_name VARCHAR(255),
+        consignment_qty INT,
+        consignment_price DECIMAL(10,2),
+        user_id INT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `;
+
+    db.query(createTables, (err) => {
+      if (err) {
+        console.error('Error creating tables:', err);
+        return;
+      }
+      console.log('Database tables created/verified');
+    });
   });
-});
+} catch (error) {
+  console.error('Failed to create database connection:', error);
+}
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
@@ -85,6 +85,7 @@ app.post('/api/login', async (req, res) => {
 
   db.query('SELECT * FROM users WHERE username = ?', [username], async (err, results) => {
     if (err) {
+      console.error('Database error during login:', err);
       return res.status(500).json({ message: 'Database error' });
     }
 
@@ -114,6 +115,7 @@ app.post('/api/register', async (req, res) => {
     [username, hashedPassword, email],
     (err) => {
       if (err) {
+        console.error('Database error during registration:', err);
         if (err.code === 'ER_DUP_ENTRY') {
           return res.status(400).json({ message: 'Username already exists' });
         }
