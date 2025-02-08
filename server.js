@@ -20,14 +20,15 @@ async function initializeDatabase() {
     console.log('Port:', process.env.MYSQLPORT);
     console.log('Database:', process.env.MYSQLDATABASE);
     
-    if (!process.env.MYSQLPASSWORD) {
-      throw new Error('MYSQLPASSWORD environment variable is not set');
+    const password = process.env.MYSQL_ROOT_PASSWORD || process.env.MYSQLPASSWORD;
+    if (!password) {
+      throw new Error('Database password not found in environment variables');
     }
 
     db = await mysql.createConnection({
       host: process.env.MYSQLHOST || 'mysql.railway.internal',
       user: process.env.MYSQLUSER || 'root',
-      password: process.env.MYSQLPASSWORD,
+      password: password,
       database: process.env.MYSQLDATABASE || 'railway',
       port: process.env.MYSQLPORT || 3306
     });
