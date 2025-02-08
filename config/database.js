@@ -2,6 +2,8 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const dbUrl = process.env.DATABASE_URL;
+console.log('Attempting to connect to database...');
+console.log('Database URL format:', dbUrl ? 'URL is set' : 'URL is missing');
 
 let db;
 
@@ -15,8 +17,13 @@ async function initializeDatabase() {
             }
         };
 
+        console.log('Connecting to MySQL with SSL...');
         db = await mysql.createConnection(connectionConfig);
-        console.log('Connected to MySQL database');
+        console.log('Successfully connected to MySQL database');
+
+        // Test the connection
+        const [result] = await db.execute('SELECT 1 + 1 as test');
+        console.log('Database connection test result:', result[0].test === 2 ? 'SUCCESS' : 'FAILED');
 
         // Check if tables exist
         const [tables] = await db.execute(`
@@ -24,17 +31,25 @@ async function initializeDatabase() {
             FROM information_schema.tables 
             WHERE table_schema = DATABASE()
         `);
+        console.log('Existing tables:', tables.map(t => t.table_name).join(', ') || 'No tables found');
 
         // Only create tables if they don't exist
         if (tables.length === 0) {
+            console.log('No tables found, creating new tables...');
             await createDatabaseTables();
         } else {
             console.log('Database tables already exist, skipping creation');
         }
 
-        console.log('Database initialized successfully');
+        console.log('Database initialization completed successfully');
     } catch (error) {
-        console.error('Error initializing database:', error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            errno: error.errno,
+            sqlState: error.sqlState,
+            sqlMessage: error.sqlMessage
+        });
         process.exit(1);
     }
 }
@@ -53,6 +68,7 @@ async function createDatabaseTables() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        console.log('Created customers table');
 
         // Create purchase orders table
         await db.execute(`
@@ -66,6 +82,7 @@ async function createDatabaseTables() {
                 FOREIGN KEY (customer_id) REFERENCES customers(id)
             )
         `);
+        console.log('Created purchase_orders table');
 
         // Create transaction items table
         await db.execute(`
@@ -81,6 +98,7 @@ async function createDatabaseTables() {
                 FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
             )
         `);
+        console.log('Created transaction_items table');
 
         // Create sequence numbers table
         await db.execute(`
@@ -89,16 +107,24 @@ async function createDatabaseTables() {
                 last_number INT NOT NULL DEFAULT 0
             )
         `);
+        console.log('Created sequence_numbers table');
 
         // Insert initial sequence if not exists
         await db.execute(`
             INSERT IGNORE INTO sequence_numbers (id, last_number) 
             VALUES ('po_number', 0), ('invoice_number', 0)
         `);
+        console.log('Initialized sequence numbers');
 
-        console.log('Database tables created successfully');
+        console.log('All database tables created successfully');
     } catch (error) {
-        console.error('Error creating database tables:', error);
+        console.error('Error creating database tables:', {
+            message: error.message,
+            code: error.code,
+            errno: error.errno,
+            sqlState: error.sqlState,
+            sqlMessage: error.sqlMessage
+        });
         throw error;
     }
 }
