@@ -135,20 +135,25 @@ async function loadTransactions() {
 document.getElementById('transactionForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const unitPrice = parseFloat(document.getElementById('unitPrice').value);
-    const formData = {
-        po_number: generatePONumber(),
-        customer_name: document.getElementById('customerName').value,
-        item_name: document.getElementById('itemName').value,
-        unit_price: unitPrice,
-        quantity: parseInt(document.getElementById('quantity').value),
-        total_price: parseFloat(document.getElementById('totalPrice').value),
-        consignment_name: document.getElementById('consignmentName').value || null,
-        consignment_qty: document.getElementById('consignmentQty').value ? parseInt(document.getElementById('consignmentQty').value) : null,
-        consignment_price: document.getElementById('consignmentQty').value ? unitPrice : null
-    };
-
     try {
+        const unitPrice = parseFloat(document.getElementById('unitPrice').value);
+        const quantity = parseInt(document.getElementById('quantity').value);
+        const totalPrice = unitPrice * quantity;
+
+        const formData = {
+            po_number: generatePONumber(),
+            customer_name: document.getElementById('customerName').value,
+            item_name: document.getElementById('itemName').value,
+            unit_price: unitPrice,
+            quantity: quantity,
+            total_price: totalPrice,
+            consignment_name: document.getElementById('consignmentName').value || null,
+            consignment_qty: document.getElementById('consignmentQty').value ? parseInt(document.getElementById('consignmentQty').value) : null,
+            consignment_price: document.getElementById('consignmentQty').value ? unitPrice : null
+        };
+
+        console.log('Sending transaction data:', formData);
+
         const response = await fetch('/api/transactions', {
             method: 'POST',
             headers: {
@@ -159,7 +164,8 @@ document.getElementById('transactionForm').addEventListener('submit', async func
         });
 
         if (!response.ok) {
-            throw new Error('Failed to save transaction');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to save transaction');
         }
 
         Swal.fire({
@@ -184,7 +190,7 @@ document.getElementById('transactionForm').addEventListener('submit', async func
         Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: 'Failed to save transaction'
+            text: error.message || 'Failed to save transaction'
         });
     }
 });

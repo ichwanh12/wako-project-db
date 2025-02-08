@@ -127,23 +127,36 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
       po_number,
       customer_name,
       item_name,
-      price,
-      quantity,
       unit_price,
+      quantity,
       total_price,
       consignment_name,
       consignment_qty,
       consignment_price
     } = req.body;
 
-    const result = await db.query(
+    console.log('Received transaction data:', req.body);
+
+    const [result] = await db.query(
       `INSERT INTO transactions 
-      (po_number, customer_name, item_name, price, quantity, unit_price, total_price, 
+      (po_number, customer_name, item_name, unit_price, quantity, total_price,
        consignment_name, consignment_qty, consignment_price, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [po_number, customer_name, item_name, price, quantity, unit_price, total_price,
-       consignment_name, consignment_qty, consignment_price, req.user.id]
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        po_number,
+        customer_name,
+        item_name,
+        unit_price,
+        quantity,
+        total_price,
+        consignment_name || null,
+        consignment_qty || null,
+        consignment_price || null,
+        req.user.id
+      ]
     );
+
+    console.log('Transaction saved successfully:', result);
 
     res.status(201).json({ 
       message: 'Transaction created successfully',
