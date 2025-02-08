@@ -15,13 +15,23 @@ let db;
 // Database connection
 async function initializeDatabase() {
   try {
-    console.log('Database URL:', process.env.MYSQL_URL);
+    console.log('Connecting to database...');
+    console.log('Host:', process.env.MYSQLHOST);
+    console.log('Port:', process.env.MYSQLPORT);
+    console.log('Database:', process.env.MYSQLDATABASE);
     
-    if (!process.env.MYSQL_URL) {
-      throw new Error('MYSQL_URL environment variable is not set');
+    if (!process.env.MYSQLPASSWORD) {
+      throw new Error('MYSQLPASSWORD environment variable is not set');
     }
 
-    db = await mysql.createConnection(process.env.MYSQL_URL);
+    db = await mysql.createConnection({
+      host: process.env.MYSQLHOST || 'mysql.railway.internal',
+      user: process.env.MYSQLUSER || 'root',
+      password: process.env.MYSQLPASSWORD,
+      database: process.env.MYSQLDATABASE || 'railway',
+      port: process.env.MYSQLPORT || 3306
+    });
+    
     console.log('Connected to MySQL database');
     
     // Create tables if they don't exist
