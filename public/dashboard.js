@@ -1,6 +1,5 @@
-// Check if user is logged in
-const token = localStorage.getItem('token');
-if (!token) {
+// Check if token exists
+if (!localStorage.getItem('token')) {
     window.location.href = '/';
 }
 
@@ -26,24 +25,109 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-// Logout
+// Logout function
 document.getElementById('logoutBtn').addEventListener('click', function() {
     localStorage.removeItem('token');
     window.location.href = '/';
 });
 
-// Transaction Form Submit
+// Generate PO Number
+function generatePONumber() {
+    const date = new Date();
+    const year = date.getFullYear().toString().substr(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const random = Math.floor(1000 + Math.random() * 9000); // 4 digit random number
+    return `WK-${year}${month}${day}-${random}`;
+}
+
+// Calculate total price
+function calculateTotal() {
+    const unitPrice = parseFloat(document.getElementById('unitPrice').value) || 0;
+    const quantity = parseInt(document.getElementById('quantity').value) || 0;
+    const totalPrice = unitPrice * quantity;
+    document.getElementById('totalPrice').value = totalPrice.toFixed(2);
+}
+
+// Add event listeners for price calculation
+document.getElementById('unitPrice').addEventListener('input', calculateTotal);
+document.getElementById('quantity').addEventListener('input', calculateTotal);
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
+}
+
+// Format date
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Load transactions
+async function loadTransactions() {
+    try {
+        const response = await fetch('/api/transactions', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load transactions');
+        }
+
+        const transactions = await response.json();
+        const tbody = document.getElementById('reportTableBody');
+        tbody.innerHTML = '';
+
+        transactions.forEach(t => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${t.po_number}</td>
+                <td>${formatDate(t.date)}</td>
+                <td>${t.customer_name}</td>
+                <td>${t.item_name}</td>
+                <td>${t.quantity}</td>
+                <td>${formatCurrency(t.unit_price)}</td>
+                <td>${formatCurrency(t.total_price)}</td>
+                <td>
+                    ${t.consignment_name ? `
+                        ${t.consignment_name}<br>
+                        Qty: ${t.consignment_qty}<br>
+                        Price: ${formatCurrency(t.consignment_price)}
+                    ` : '-'}
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load transactions'
+        });
+    }
+}
+
+// Handle form submission
 document.getElementById('transactionForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const formData = {
+        po_number: generatePONumber(),
         customer_name: document.getElementById('customerName').value,
         item_name: document.getElementById('itemName').value,
-        price: parseFloat(document.getElementById('price').value),
-        quantity: parseInt(document.getElementById('quantity').value),
         unit_price: parseFloat(document.getElementById('unitPrice').value),
-        total_price: parseFloat(document.getElementById('price').value) * parseInt(document.getElementById('quantity').value),
-        consignment_name: document.getElementById('consignmentName').value,
+        quantity: parseInt(document.getElementById('quantity').value),
+        total_price: parseFloat(document.getElementById('totalPrice').value),
+        consignment_name: document.getElementById('consignmentName').value || null,
         consignment_qty: document.getElementById('consignmentQty').value ? parseInt(document.getElementById('consignmentQty').value) : null,
         consignment_price: document.getElementById('consignmentPrice').value ? parseFloat(document.getElementById('consignmentPrice').value) : null
     };
@@ -53,57 +137,38 @@ document.getElementById('transactionForm').addEventListener('submit', async func
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify(formData)
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            alert('Data berhasil disimpan!');
-            document.getElementById('transactionForm').reset();
-        } else {
-            alert(data.message || 'Gagal menyimpan data');
+        if (!response.ok) {
+            throw new Error('Failed to save transaction');
         }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: 'Transaction saved successfully',
+            showConfirmButton: false,
+            timer: 1500
+        });
+
+        // Reset form
+        e.target.reset();
+        document.getElementById('totalPrice').value = '';
+        
+        // Reload transactions
+        loadTransactions();
     } catch (error) {
         console.error('Error:', error);
-        alert('Terjadi kesalahan saat menyimpan data');
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to save transaction'
+        });
     }
 });
 
-// Load Transactions for Report
-async function loadTransactions() {
-    try {
-        const response = await fetch('/api/transactions', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const transactions = await response.json();
-
-        const tableBody = document.getElementById('reportTableBody');
-        tableBody.innerHTML = '';
-
-        transactions.forEach(t => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${new Date(t.date).toLocaleDateString()}</td>
-                <td>${t.customer_name}</td>
-                <td>${t.item_name}</td>
-                <td>${t.price}</td>
-                <td>${t.quantity}</td>
-                <td>${t.unit_price}</td>
-                <td>${t.total_price}</td>
-                <td>${t.consignment_name || '-'}</td>
-                <td>${t.consignment_qty || '-'}</td>
-                <td>${t.consignment_price || '-'}</td>
-            `;
-            tableBody.appendChild(row);
-        });
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Gagal memuat data transaksi');
-    }
-}
+// Initial load
+loadTransactions();

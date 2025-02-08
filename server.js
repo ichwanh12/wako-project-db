@@ -34,6 +34,7 @@ async function initializeDatabase() {
 
     await db.query(`CREATE TABLE IF NOT EXISTS transactions (
       id INT AUTO_INCREMENT PRIMARY KEY,
+      po_number VARCHAR(20) NOT NULL UNIQUE,
       date DATETIME DEFAULT CURRENT_TIMESTAMP,
       customer_name VARCHAR(255) NOT NULL,
       item_name VARCHAR(255) NOT NULL,
@@ -123,6 +124,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/transactions', authenticateToken, async (req, res) => {
   try {
     const {
+      po_number,
       customer_name,
       item_name,
       price,
@@ -136,10 +138,10 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO transactions 
-      (customer_name, item_name, price, quantity, unit_price, total_price, 
+      (po_number, customer_name, item_name, price, quantity, unit_price, total_price, 
        consignment_name, consignment_qty, consignment_price, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [customer_name, item_name, price, quantity, unit_price, total_price,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [po_number, customer_name, item_name, price, quantity, unit_price, total_price,
        consignment_name, consignment_qty, consignment_price, req.user.id]
     );
 
