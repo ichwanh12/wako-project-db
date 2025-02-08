@@ -79,6 +79,38 @@ function addItemRow() {
 // Add event listener for add item button
 document.getElementById('addItemBtn').addEventListener('click', addItemRow);
 
+// Download PDF function
+async function downloadPDF(poNumber) {
+    try {
+        const response = await fetch(`/api/transactions/${poNumber}/invoice/download`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download PDF');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice-${poNumber}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message
+        });
+    }
+}
+
 // Generate invoice
 async function generateInvoice(poNumber) {
     try {
@@ -97,7 +129,7 @@ async function generateInvoice(poNumber) {
         const data = await response.json();
         
         // Then download PDF
-        window.location.href = `/api/transactions/${poNumber}/invoice/download`;
+        await downloadPDF(poNumber);
 
         Swal.fire({
             icon: 'success',
@@ -175,9 +207,9 @@ async function loadTransactions() {
                     ${t.invoice_number ? `
                         ${t.invoice_number}<br>
                         ${formatDate(t.invoice_date)}<br>
-                        <a href="/api/transactions/${t.po_number}/invoice/download" class="btn btn-sm btn-info" target="_blank">
+                        <button onclick="downloadPDF('${t.po_number}')" class="btn btn-sm btn-info">
                             <i class="fas fa-download"></i> Download PDF
-                        </a>
+                        </button>
                     ` : '-'}
                 </td>
                 <td>
