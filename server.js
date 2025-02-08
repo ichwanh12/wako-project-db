@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const PDFDocument = require('pdfkit');
@@ -511,12 +511,11 @@ app.get('/dashboard', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Initialize database and start server
-initializeDatabase().then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on port ${PORT}`);
-    });
-}).catch(error => {
-    console.error('Failed to initialize database:', error);
+// Start server with proper error handling
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    initializeDatabase();
+}).on('error', (err) => {
+    console.error('Failed to start server:', err);
     process.exit(1);
 });
