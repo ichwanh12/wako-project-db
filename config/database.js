@@ -19,12 +19,7 @@ async function initializeDatabase() {
 
 async function createDatabaseTables() {
     try {
-        console.log('Creating database tables...');
-
-        // Drop existing tables in correct order
-        await db.execute('DROP TABLE IF EXISTS transaction_items');
-        await db.execute('DROP TABLE IF EXISTS purchase_orders');
-        await db.execute('DROP TABLE IF EXISTS customers');
+        console.log('Creating database tables if they don\'t exist...');
 
         // Create customers table
         await db.execute(`
@@ -79,7 +74,7 @@ async function createDatabaseTables() {
             VALUES ('po_number', 0), ('invoice_number', 0)
         `);
 
-        console.log('Database tables created successfully');
+        console.log('Database tables checked/created successfully');
     } catch (error) {
         console.error('Error creating database tables:', error);
         throw error;

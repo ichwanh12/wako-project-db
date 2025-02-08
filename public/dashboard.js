@@ -248,30 +248,23 @@ async function loadTransactions() {
 // Handle form submission
 document.getElementById('transactionForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-
+    
     try {
+        const customerId = document.getElementById('customerId').value;
         const items = [];
-        const itemRows = document.getElementById('itemsContainer').children;
-
-        for (const row of itemRows) {
-            const item = {
+        
+        // Get all item rows
+        const itemRows = document.querySelectorAll('.item-row');
+        itemRows.forEach(row => {
+            items.push({
                 item_name: row.querySelector('.item-name').value,
                 unit_price: parseFloat(row.querySelector('.item-unit-price').value),
                 quantity: parseInt(row.querySelector('.item-quantity').value),
-                total_price: parseFloat(row.querySelector('.item-total-price').value)
-            };
-
-            const consignmentName = row.querySelector('.item-consignment-name').value;
-            const consignmentQty = parseInt(row.querySelector('.item-consignment-qty').value) || 0;
-
-            if (consignmentName && consignmentQty > 0) {
-                item.consignment_name = consignmentName;
-                item.consignment_qty = consignmentQty;
-            }
-
-            items.push(item);
-        }
-
+                consignment_name: row.querySelector('.item-consignment-name').value,
+                consignment_qty: parseInt(row.querySelector('.item-consignment-qty').value) || 0
+            });
+        });
+        
         const response = await fetch('/api/transactions', {
             method: 'POST',
             headers: {
@@ -279,32 +272,43 @@ document.getElementById('transactionForm').addEventListener('submit', async func
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
-                company_name: document.getElementById('companyName').value,
-                customer_name: document.getElementById('customerName').value,
-                customer_phone: document.getElementById('customerPhone').value,
+                customer_id: customerId,
                 items: items
             })
         });
-
+        
         if (!response.ok) {
-            throw new Error('Failed to save transaction');
+            throw new Error('Failed to create transaction');
         }
-
+        
         const data = await response.json();
         
         Swal.fire({
             icon: 'success',
             title: 'Success!',
-            text: `Transaction saved with PO number: ${data.po_number}`
+            text: `Transaction ${data.po_number} created successfully`
+        }).then(() => {
+            // Reset form
+            document.getElementById('transactionForm').reset();
+            // Clear items except first one
+            const itemsContainer = document.getElementById('itemsContainer');
+            while (itemsContainer.children.length > 1) {
+                itemsContainer.removeChild(itemsContainer.lastChild);
+            }
+            // Reset first item's values
+            const firstItem = itemsContainer.firstChild;
+            if (firstItem) {
+                firstItem.querySelector('.item-name').value = '';
+                firstItem.querySelector('.item-unit-price').value = '';
+                firstItem.querySelector('.item-quantity').value = '';
+                firstItem.querySelector('.item-consignment-name').value = '';
+                firstItem.querySelector('.item-consignment-qty').value = '';
+                firstItem.querySelector('.item-total-price').value = '';
+            } else {
+                // If no items exist, add one
+                addItemRow();
+            }
         });
-
-        // Reset form
-        e.target.reset();
-        document.getElementById('itemsContainer').innerHTML = '';
-        addItemRow(); // Add one empty item row
-
-        // Switch to list tab
-        document.getElementById('list-tab').click();
     } catch (error) {
         console.error('Error:', error);
         Swal.fire({
