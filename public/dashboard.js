@@ -516,17 +516,21 @@ document.getElementById('addCustomerBtn').addEventListener('click', () => showCu
 // Load customers when tab is shown
 document.getElementById('customers-tab').addEventListener('click', loadCustomers);
 
-// Initial load of customer select
-loadCustomerSelect();
-
-// Initialize
+// Load initial data when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Add first item row
     addItemRow();
     
-    // Load transactions if list tab is active
-    const listTab = document.getElementById('list-tab');
-    if (listTab.classList.contains('active')) {
+    // Load customer select
+    loadCustomerSelect();
+    
+    // Load transactions if on list tab
+    if (document.querySelector('#list-tab').classList.contains('active')) {
         loadTransactions();
+    }
+    
+    // Load customers if on customers tab
+    if (document.querySelector('#customers-tab').classList.contains('active')) {
+        loadCustomers();
     }
 });
