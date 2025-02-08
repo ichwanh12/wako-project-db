@@ -100,7 +100,7 @@ async function loadTransactions() {
                     ${t.consignment_name ? `
                         ${t.consignment_name}<br>
                         Qty: ${t.consignment_qty}<br>
-                        Price: ${formatCurrency(t.consignment_price)}
+                        Price: ${formatCurrency(t.unit_price)}
                     ` : '-'}
                 </td>
             `;
@@ -120,16 +120,17 @@ async function loadTransactions() {
 document.getElementById('transactionForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
+    const unitPrice = parseFloat(document.getElementById('unitPrice').value);
     const formData = {
         po_number: generatePONumber(),
         customer_name: document.getElementById('customerName').value,
         item_name: document.getElementById('itemName').value,
-        unit_price: parseFloat(document.getElementById('unitPrice').value),
+        unit_price: unitPrice,
         quantity: parseInt(document.getElementById('quantity').value),
         total_price: parseFloat(document.getElementById('totalPrice').value),
         consignment_name: document.getElementById('consignmentName').value || null,
         consignment_qty: document.getElementById('consignmentQty').value ? parseInt(document.getElementById('consignmentQty').value) : null,
-        consignment_price: document.getElementById('consignmentPrice').value ? parseFloat(document.getElementById('consignmentPrice').value) : null
+        consignment_price: document.getElementById('consignmentQty').value ? unitPrice : null
     };
 
     try {

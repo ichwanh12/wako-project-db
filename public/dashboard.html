@@ -38,6 +38,14 @@
         .table th {
             background-color: #f8f9fa;
         }
+        .nav-tabs .nav-link {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .nav-tabs .nav-link.active {
+            color: #3498db;
+            border-color: #3498db;
+        }
     </style>
 </head>
 <body>
@@ -58,11 +66,25 @@
     </nav>
 
     <div class="container">
-        <div class="row mb-4">
-            <div class="col-md-12">
+        <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="input-tab" data-bs-toggle="tab" data-bs-target="#input" type="button" role="tab">
+                    <i class="fas fa-plus-circle"></i> Input Transaction
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="list-tab" data-bs-toggle="tab" data-bs-target="#list" type="button" role="tab">
+                    <i class="fas fa-list"></i> Transaction List
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            <!-- Input Tab -->
+            <div class="tab-pane fade show active" id="input" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-plus-circle"></i> New Transaction</h5>
+                    <div class="card-header">
+                        <h5 class="mb-0">New Transaction</h5>
                     </div>
                     <div class="card-body">
                         <form id="transactionForm">
@@ -93,22 +115,26 @@
                                         <input type="number" class="form-control" id="totalPrice" readonly>
                                     </div>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Consignment Name</label>
-                                    <input type="text" class="form-control" id="consignmentName">
+                            </div>
+
+                            <div class="card mt-3 mb-3">
+                                <div class="card-header bg-secondary">
+                                    <h6 class="mb-0">Consignment Details</h6>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Consignment Quantity</label>
-                                    <input type="number" class="form-control" id="consignmentQty">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Consignment Price</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">Rp</span>
-                                        <input type="number" class="form-control" id="consignmentPrice">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Consignment Name</label>
+                                            <input type="text" class="form-control" id="consignmentName">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Consignment Quantity</label>
+                                            <input type="number" class="form-control" id="consignmentQty">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Transaction</button>
                             </div>
@@ -116,13 +142,12 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="row">
-            <div class="col-md-12">
+            <!-- List Tab -->
+            <div class="tab-pane fade" id="list" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-list"></i> Transaction List</h5>
+                    <div class="card-header">
+                        <h5 class="mb-0">Transaction List</h5>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
