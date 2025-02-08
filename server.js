@@ -25,32 +25,29 @@ async function initializeDatabase() {
     console.log('Connected to MySQL database');
     
     // Create tables if they don't exist
-    const createTables = `
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(255) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL,
-        email VARCHAR(255)
-      );
+    await db.query(`CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(255) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      email VARCHAR(255)
+    )`);
 
-      CREATE TABLE IF NOT EXISTS transactions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        date DATETIME DEFAULT CURRENT_TIMESTAMP,
-        customer_name VARCHAR(255) NOT NULL,
-        item_name VARCHAR(255) NOT NULL,
-        price DECIMAL(10,2) NOT NULL,
-        quantity INT NOT NULL,
-        unit_price DECIMAL(10,2) NOT NULL,
-        total_price DECIMAL(10,2) NOT NULL,
-        consignment_name VARCHAR(255),
-        consignment_qty INT,
-        consignment_price DECIMAL(10,2),
-        user_id INT,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      );
-    `;
-
-    await db.query(createTables);
+    await db.query(`CREATE TABLE IF NOT EXISTS transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      customer_name VARCHAR(255) NOT NULL,
+      item_name VARCHAR(255) NOT NULL,
+      price DECIMAL(10,2) NOT NULL,
+      quantity INT NOT NULL,
+      unit_price DECIMAL(10,2) NOT NULL,
+      total_price DECIMAL(10,2) NOT NULL,
+      consignment_name VARCHAR(255),
+      consignment_qty INT,
+      consignment_price DECIMAL(10,2),
+      user_id INT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+    
     console.log('Database tables created/verified');
   } catch (error) {
     console.error('Database connection error:', error);
