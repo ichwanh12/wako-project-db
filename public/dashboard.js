@@ -3,54 +3,20 @@ if (!localStorage.getItem('token')) {
     window.location.href = '/';
 }
 
-// Navigation
-document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const page = this.dataset.page;
-        
-        // Update active state
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        this.classList.add('active');
-        
-        // Show/hide pages
-        if (page === 'input') {
-            document.getElementById('inputPage').style.display = 'block';
-            document.getElementById('reportPage').style.display = 'none';
-        } else if (page === 'report') {
-            document.getElementById('inputPage').style.display = 'none';
-            document.getElementById('reportPage').style.display = 'block';
-        }
-    });
-});
-
 // Logout function
 document.getElementById('logoutBtn').addEventListener('click', function() {
     localStorage.removeItem('token');
     window.location.href = '/';
 });
 
-// Generate PO Number
-function generatePONumber() {
-    const date = new Date();
-    const year = date.getFullYear().toString().substr(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const random = Math.floor(1000 + Math.random() * 9000); // 4 digit random number
-    return `WK-${year}${month}${day}-${random}`;
-}
-
-// Calculate total price
-function calculateTotal() {
-    const unitPrice = parseFloat(document.getElementById('unitPrice').value) || 0;
-    const quantity = parseInt(document.getElementById('quantity').value) || 0;
-    const totalPrice = unitPrice * quantity;
-    document.getElementById('totalPrice').value = totalPrice.toFixed(2);
-}
-
-// Add event listeners for price calculation
-document.getElementById('unitPrice').addEventListener('input', calculateTotal);
-document.getElementById('quantity').addEventListener('input', calculateTotal);
+// Add tab change event listener
+document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function (event) {
+        if (event.target.id === 'list-tab') {
+            loadTransactions();
+        }
+    });
+});
 
 // Format currency
 function formatCurrency(amount) {
@@ -68,18 +34,92 @@ function formatDate(dateString) {
     });
 }
 
-// Add tab change event listener
-document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
-    tab.addEventListener('shown.bs.tab', function (event) {
-        if (event.target.id === 'list-tab') {
-            loadTransactions();
+// Calculate total price for an item row
+function calculateItemTotal(itemRow) {
+    const unitPrice = parseFloat(itemRow.querySelector('.item-unit-price').value) || 0;
+    const quantity = parseInt(itemRow.querySelector('.item-quantity').value) || 0;
+    const consignmentQty = parseInt(itemRow.querySelector('.item-consignment-qty').value) || 0;
+    
+    const regularTotal = unitPrice * quantity;
+    const consignmentTotal = unitPrice * consignmentQty;
+    const totalPrice = regularTotal + consignmentTotal;
+    
+    itemRow.querySelector('.item-total-price').value = totalPrice.toFixed(2);
+    return totalPrice;
+}
+
+// Add new item row
+function addItemRow() {
+    const template = document.getElementById('itemRowTemplate');
+    const itemRow = template.content.cloneNode(true);
+    document.getElementById('itemsContainer').appendChild(itemRow);
+
+    const newRow = document.getElementById('itemsContainer').lastElementChild;
+
+    // Add event listeners for price calculation
+    const inputs = newRow.querySelectorAll('.item-unit-price, .item-quantity, .item-consignment-qty');
+    inputs.forEach(input => {
+        input.addEventListener('input', () => calculateItemTotal(newRow));
+    });
+
+    // Add event listener for remove button
+    newRow.querySelector('.remove-item').addEventListener('click', function() {
+        if (document.getElementById('itemsContainer').children.length > 1) {
+            newRow.remove();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'At least one item is required'
+            });
         }
     });
-});
+}
+
+// Add event listener for add item button
+document.getElementById('addItemBtn').addEventListener('click', addItemRow);
+
+// Generate invoice
+async function generateInvoice(poNumber) {
+    try {
+        // First generate invoice number
+        const response = await fetch(`/api/transactions/${poNumber}/invoice`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate invoice');
+        }
+
+        const data = await response.json();
+        
+        // Then download PDF
+        window.location.href = `/api/transactions/${poNumber}/invoice/download`;
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: `Invoice ${data.invoice_number} generated successfully`
+        });
+
+        loadTransactions();
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message
+        });
+    }
+}
 
 // Load transactions
 async function loadTransactions() {
     try {
+        console.log('Loading transactions...');
         const response = await fetch('/api/transactions', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -91,42 +131,70 @@ async function loadTransactions() {
         }
 
         const transactions = await response.json();
-        const tbody = document.getElementById('transactionTableBody');
+        console.log('Transactions loaded:', transactions);
         
-        // Check if tbody exists before manipulating it
+        const tbody = document.getElementById('transactionTableBody');
         if (!tbody) {
-            console.error('Transaction list table body not found');
+            console.error('Transaction table body not found');
             return;
         }
 
         tbody.innerHTML = '';
 
-        if (transactions.length === 0) {
+        if (!transactions || transactions.length === 0) {
             const row = document.createElement('tr');
-            row.innerHTML = '<td colspan="8" class="text-center">No transactions found</td>';
+            row.innerHTML = '<td colspan="7" class="text-center">No transactions found</td>';
             tbody.appendChild(row);
             return;
         }
 
         transactions.forEach(t => {
             const row = document.createElement('tr');
+            
+            // Calculate total for all items
+            const total = t.items.reduce((sum, item) => {
+                return sum + parseFloat(item.total_price);
+            }, 0);
+
+            // Create items summary
+            const itemsSummary = t.items.map(item => {
+                let summary = `${item.item_name} (${item.quantity} × ${formatCurrency(item.unit_price)})`;
+                if (item.consignment_name) {
+                    summary += `<br>+ Titipan: ${item.consignment_name} (${item.consignment_qty} × ${formatCurrency(item.unit_price)})`;
+                }
+                return summary;
+            }).join('<hr class="my-1">');
+
             row.innerHTML = `
                 <td>${t.po_number}</td>
                 <td>${formatDate(t.date)}</td>
                 <td>${t.customer_name}</td>
-                <td>${t.item_name}</td>
-                <td>${t.quantity}</td>
-                <td>${formatCurrency(t.unit_price)}</td>
-                <td>${formatCurrency(t.total_price)}</td>
+                <td>${itemsSummary}</td>
+                <td>${formatCurrency(total)}</td>
                 <td>
-                    ${t.consignment_name ? `
-                        ${t.consignment_name}<br>
-                        Qty: ${t.consignment_qty}<br>
-                        Price: ${formatCurrency(t.unit_price)}
+                    ${t.invoice_number ? `
+                        ${t.invoice_number}<br>
+                        ${formatDate(t.invoice_date)}<br>
+                        <a href="/api/transactions/${t.po_number}/invoice/download" class="btn btn-sm btn-info" target="_blank">
+                            <i class="fas fa-download"></i> Download PDF
+                        </a>
                     ` : '-'}
+                </td>
+                <td>
+                    ${!t.invoice_number ? `
+                        <button class="btn btn-sm btn-primary generate-invoice" data-po="${t.po_number}">
+                            <i class="fas fa-file-invoice"></i> Generate Invoice
+                        </button>
+                    ` : ''}
                 </td>
             `;
             tbody.appendChild(row);
+
+            // Add event listener for generate invoice button
+            const invoiceBtn = row.querySelector('.generate-invoice');
+            if (invoiceBtn) {
+                invoiceBtn.addEventListener('click', () => generateInvoice(t.po_number));
+            }
         });
     } catch (error) {
         console.error('Error:', error);
@@ -143,45 +211,48 @@ document.getElementById('transactionForm').addEventListener('submit', async func
     e.preventDefault();
 
     try {
-        // Get form values
         const customerName = document.getElementById('customerName').value;
-        const itemName = document.getElementById('itemName').value;
-        const unitPrice = parseFloat(document.getElementById('unitPrice').value);
-        const quantity = parseInt(document.getElementById('quantity').value);
-        const totalPrice = unitPrice * quantity;
-
-        // Validate required fields
-        if (!customerName || !itemName || !unitPrice || !quantity) {
-            throw new Error('Please fill in all required fields');
+        if (!customerName) {
+            throw new Error('Please enter customer name');
         }
 
-        // Validate numbers
-        if (isNaN(unitPrice) || unitPrice <= 0) {
-            throw new Error('Please enter a valid unit price');
-        }
-        if (isNaN(quantity) || quantity <= 0) {
-            throw new Error('Please enter a valid quantity');
+        // Get all item rows
+        const itemRows = document.getElementById('itemsContainer').children;
+        if (itemRows.length === 0) {
+            throw new Error('Please add at least one item');
         }
 
-        // Create form data
+        // Collect items data
+        const items = [];
+        for (const row of itemRows) {
+            const itemName = row.querySelector('.item-name').value;
+            const unitPrice = parseFloat(row.querySelector('.item-unit-price').value);
+            const quantity = parseInt(row.querySelector('.item-quantity').value);
+            const consignmentName = row.querySelector('.item-consignment-name').value;
+            const consignmentQty = row.querySelector('.item-consignment-qty').value;
+
+            if (!itemName || !unitPrice || !quantity) {
+                throw new Error('Please fill in all required fields for each item');
+            }
+
+            const item = {
+                item_name: itemName,
+                unit_price: unitPrice,
+                quantity: quantity
+            };
+
+            if (consignmentName && consignmentQty) {
+                item.consignment_name = consignmentName;
+                item.consignment_qty = parseInt(consignmentQty);
+            }
+
+            items.push(item);
+        }
+
         const formData = {
-            po_number: generatePONumber(),
             customer_name: customerName,
-            item_name: itemName,
-            unit_price: unitPrice,
-            quantity: quantity,
-            total_price: totalPrice
+            items: items
         };
-
-        // Add consignment data if provided
-        const consignmentName = document.getElementById('consignmentName').value;
-        const consignmentQty = document.getElementById('consignmentQty').value;
-        
-        if (consignmentName && consignmentQty) {
-            formData.consignment_name = consignmentName;
-            formData.consignment_qty = parseInt(consignmentQty);
-            formData.consignment_price = unitPrice;
-        }
 
         console.log('Sending transaction data:', formData);
 
@@ -210,7 +281,8 @@ document.getElementById('transactionForm').addEventListener('submit', async func
 
         // Reset form
         e.target.reset();
-        document.getElementById('totalPrice').value = '';
+        document.getElementById('itemsContainer').innerHTML = '';
+        addItemRow(); // Add one empty item row
         
         // Switch to list tab and reload transactions
         const listTab = document.getElementById('list-tab');
@@ -229,5 +301,14 @@ document.getElementById('transactionForm').addEventListener('submit', async func
     }
 });
 
-// Initial load
-document.getElementById('list-tab').click();
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Add first item row
+    addItemRow();
+    
+    // Load transactions if list tab is active
+    const listTab = document.getElementById('list-tab');
+    if (listTab.classList.contains('active')) {
+        loadTransactions();
+    }
+});
