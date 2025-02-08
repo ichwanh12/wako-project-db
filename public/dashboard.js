@@ -315,6 +315,210 @@ document.getElementById('transactionForm').addEventListener('submit', async func
     }
 });
 
+// Load customers into select dropdown
+async function loadCustomerSelect() {
+    try {
+        const response = await fetch('/api/customers', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        const customers = await response.json();
+        
+        const select = document.getElementById('customerId');
+        select.innerHTML = '<option value="">Choose a customer...</option>';
+        
+        customers.forEach(customer => {
+            const option = document.createElement('option');
+            option.value = customer.id;
+            option.textContent = customer.company_name ? 
+                `${customer.company_name} (${customer.contact_name})` : 
+                customer.contact_name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading customers:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load customers'
+        });
+    }
+}
+
+// Load customers into table
+async function loadCustomers() {
+    try {
+        const response = await fetch('/api/customers', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        const customers = await response.json();
+        
+        const tbody = document.getElementById('customerTableBody');
+        tbody.innerHTML = '';
+        
+        customers.forEach(customer => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${customer.company_name || '-'}</td>
+                <td>${customer.contact_name}</td>
+                <td>${customer.phone || '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary edit-customer" data-id="${customer.id}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger delete-customer" data-id="${customer.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        // Add event listeners to edit and delete buttons
+        document.querySelectorAll('.edit-customer').forEach(btn => {
+            btn.addEventListener('click', () => editCustomer(customers.find(c => c.id == btn.dataset.id)));
+        });
+
+        document.querySelectorAll('.delete-customer').forEach(btn => {
+            btn.addEventListener('click', () => deleteCustomer(btn.dataset.id));
+        });
+    } catch (error) {
+        console.error('Error loading customers:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to load customers'
+        });
+    }
+}
+
+// Add/Edit customer modal
+async function showCustomerModal(customer = null) {
+    const { value: formValues } = await Swal.fire({
+        title: customer ? 'Edit Customer' : 'Add Customer',
+        html: `
+            <input id="company_name" class="swal2-input" placeholder="Company Name" value="${customer?.company_name || ''}">
+            <input id="contact_name" class="swal2-input" placeholder="Contact Name" value="${customer?.contact_name || ''}" required>
+            <input id="phone" class="swal2-input" placeholder="Phone Number" value="${customer?.phone || ''}">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        preConfirm: () => {
+            const contact_name = document.getElementById('contact_name').value;
+            if (!contact_name) {
+                Swal.showValidationMessage('Contact name is required');
+                return false;
+            }
+            return {
+                company_name: document.getElementById('company_name').value,
+                contact_name: contact_name,
+                phone: document.getElementById('phone').value
+            };
+        }
+    });
+
+    if (formValues) {
+        try {
+            const url = customer ? 
+                `/api/customers/${customer.id}` : 
+                '/api/customers';
+            
+            const response = await fetch(url, {
+                method: customer ? 'PUT' : 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(formValues)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save customer');
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: `Customer ${customer ? 'updated' : 'added'} successfully`
+            });
+
+            // Reload customers
+            await loadCustomers();
+            await loadCustomerSelect();
+        } catch (error) {
+            console.error('Error saving customer:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message
+            });
+        }
+    }
+}
+
+// Edit customer
+function editCustomer(customer) {
+    showCustomerModal(customer);
+}
+
+// Delete customer
+async function deleteCustomer(id) {
+    const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const response = await fetch(`/api/customers/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete customer');
+            }
+
+            Swal.fire(
+                'Deleted!',
+                'Customer has been deleted.',
+                'success'
+            );
+
+            // Reload customers
+            await loadCustomers();
+            await loadCustomerSelect();
+        } catch (error) {
+            console.error('Error deleting customer:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message
+            });
+        }
+    }
+}
+
+// Event listener for add customer button
+document.getElementById('addCustomerBtn').addEventListener('click', () => showCustomerModal());
+
+// Load customers when tab is shown
+document.getElementById('customers-tab').addEventListener('click', loadCustomers);
+
+// Initial load of customer select
+loadCustomerSelect();
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     // Add first item row

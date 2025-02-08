@@ -215,9 +215,19 @@ async function generateInvoiceNumber(poDate) {
 // Create new transaction
 app.post('/api/transactions', authenticateToken, async (req, res) => {
     try {
+        const { customer_id, items } = req.body;
+
+        if (!customer_id) {
+            return res.status(400).json({ error: 'Customer ID is required' });
+        }
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'At least one item is required' });
+        }
+
         await db.beginTransaction();
 
-        const { customer_id, items } = req.body;
+        // Generate PO number
         const po_number = await generatePONumber();
 
         // Insert purchase order
@@ -230,19 +240,19 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 
         // Insert items
         for (const item of items) {
+            const total_price = item.quantity * item.unit_price;
             await db.execute(
                 `INSERT INTO transaction_items 
-                (po_id, item_name, unit_price, quantity, total_price, consignment_name, consignment_qty, consignment_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                (po_id, item_name, unit_price, quantity, total_price, consignment_name, consignment_qty) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     po_id,
                     item.item_name,
                     item.unit_price,
                     item.quantity,
-                    item.total_price || (item.unit_price * item.quantity),
+                    total_price,
                     item.consignment_name || null,
-                    item.consignment_qty || null,
-                    item.consignment_price || null
+                    item.consignment_qty || null
                 ]
             );
         }
